@@ -173,9 +173,9 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 	 */
 	public function get_item( $request ) {
 		if ( isset( $request['source'] ) && 'theme' === $request['source'] ) {
-			$template = $this->get_template_by_id( $request['id'], true );
+			$template = get_block_file_template( $this->normalize_requested_id( $request['id'] ), $this->post_type );
 		} else {
-			$template = $this->get_template_by_id( $request['id'] );
+			$template = gutenberg_get_block_template( $this->normalize_requested_id( $request['id'] ), $this->post_type );
 		}
 
 		if ( ! $template ) {
@@ -202,7 +202,7 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error Response object on success, or WP_Error object on failure.
 	 */
 	public function update_item( $request ) {
-		$template = $this->get_template_by_id( $request['id'] );
+		$template = gutenberg_get_block_template( $this->normalize_requested_id( $request['id'] ), $this->post_type );
 		if ( ! $template ) {
 			return new WP_Error( 'rest_template_not_found', __( 'No templates exist with that id.', 'gutenberg' ), array( 'status' => 404 ) );
 		}
@@ -223,7 +223,7 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 			return $result;
 		}
 
-		$template      = $this->get_template_by_id( $request['id'] );
+		$template      = gutenberg_get_block_template( $this->normalize_requested_id( $request['id'] ), $this->post_type );
 		$fields_update = $this->update_additional_fields_for_object( $template, $request );
 		if ( is_wp_error( $fields_update ) ) {
 			return $fields_update;
@@ -292,7 +292,7 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error Response object on success, or WP_Error object on failure.
 	 */
 	public function delete_item( $request ) {
-		$template = $this->get_template_by_id( $request['id'] );
+		$template = gutenberg_get_block_template( $this->normalize_requested_id( $request['id'] ), $this->post_type );
 		if ( ! $template ) {
 			return new WP_Error( 'rest_template_not_found', __( 'No templates exist with that id.', 'gutenberg' ), array( 'status' => 404 ) );
 		}
@@ -337,33 +337,32 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 	 * a path like /wp/v2/templates/twentytwentytwo//home. There are special cases when
 	 * WordPress routing corrects the name to contain only a single slash like "twentytwentytwo/home".
 	 *
-	 * This method attempts to find a template with a specific ID, and if it's missing then it
-	 * falls back to a double-slashed version of the ID.
+	 * This method infers an ID from the REQUEST_URI, checks if it seems safe, and falls back to id
+	 * provided as an argument if anything foes wrong.
 	 *
 	 * See https://core.trac.wordpress.org/ticket/54507 for more context
 	 *
-	 * @param string  $id        ID of the template.
-	 * @param boolean $from_file Optional Whether to use gutenberg_get_block_template instead of get_block_file_template.
-	 * @return WP_Block_Template|null Template.
+	 * @param string $id ID of the template.
+	 * @return string Parsed ID.
 	 */
-	private function get_template_by_id( $id, $from_file = false ) {
-		$getter   = $from_file ? 'get_block_file_template' : 'gutenberg_get_block_template';
-		$template = $getter( $id, $this->post_type );
-		if ( ! $template ) {
-			$uri       = $_SERVER['REQUEST_URI'];
-			$delimiter = '/wp/v2/templates/';
+	private function normalize_requested_id( $id ) {
+		$uri       = $_SERVER['REQUEST_URI'];
+		$delimiter = '/wp/v2/templates/';
 
-			// Extract part of the path that comes after /wp/v2/templates/.
-			$literal_id = substr( $uri, strpos( $uri, $delimiter ) + strlen( $delimiter ) );
+		// Extract part of the path that comes after /wp/v2/templates/.
+		$inferred_id = substr( $uri, strpos( $uri, $delimiter ) + strlen( $delimiter ) );
 
-			// Extract part of the path before the query string (if any).
-			$literal_id = explode( '?', $literal_id )[0];
+		// Extract part of the path before the query string (if any).
+		$inferred_id = explode( '?', $inferred_id )[0];
 
-			// Remove any trailing slashes.
-			$literal_id = rtrim( $literal_id, '/' );
-			$template   = $getter( $literal_id, $this->post_type );
+		// Remove any trailing slashes.
+		$inferred_id = rtrim( $inferred_id, '/' );
+
+		if ( str_replace( '/', '', $id ) === str_replace( '/', '', $inferred_id ) ) {
+			return $inferred_id;
+		} else {
+			return $id;
 		}
-		return $template;
 	}
 
 	/**
