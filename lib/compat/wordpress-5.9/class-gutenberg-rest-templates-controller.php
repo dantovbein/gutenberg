@@ -352,8 +352,12 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 		// Extract part of the path that comes after /wp/v2/templates/.
 		$inferred_id = substr( $uri, strpos( $uri, $delimiter ) + strlen( $delimiter ) );
 
-		// Extract part of the path before the query string (if any).
-		$inferred_id = explode( '?', $inferred_id )[0];
+		// Only use part of the path until the first querystring-like symbol (either ? or &).
+		$parts = preg_split( '|[?&]|', $inferred_id );
+		if ( ! $parts ) {
+			return $id;
+		}
+		$inferred_id = $parts[0];
 
 		// Remove any trailing slashes.
 		$inferred_id = rtrim( $inferred_id, '/' );
