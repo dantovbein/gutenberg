@@ -358,6 +358,7 @@ class Gutenberg_REST_Templates_Controller extends WP_REST_Controller {
 		// Remove any trailing slashes.
 		$inferred_id = rtrim( $inferred_id, '/' );
 
+		// Check it seems like a valid result.
 		if ( str_replace( '/', '', $id ) === str_replace( '/', '', $inferred_id ) ) {
 			return $inferred_id;
 		} else {
